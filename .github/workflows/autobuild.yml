@@ -2,11 +2,10 @@ name: Waterdeep - Build and Test
 
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
     paths-ignore:
       - "README.md"
       - "_infrastructure/**"
-      - "waterdeep/Database Change Scripts/**"
   pull_request:
   workflow_dispatch:
 
