@@ -36,7 +36,7 @@ on:
         description: 'The release number to deploy'
         required: false
         type: string
-      my-application-name:
+      eb-application-name:
         description: 'The release number to deploy'
         required: false
         type: string
