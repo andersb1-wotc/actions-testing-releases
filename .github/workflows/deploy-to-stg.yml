@@ -27,6 +27,7 @@ concurrency:
 jobs: 
 
   get-env:
+    runs-on: ubuntu-latest
     steps:
       - name: Get Git Env
         run: |
