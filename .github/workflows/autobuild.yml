@@ -21,7 +21,6 @@ concurrency:
     cancel-in-progress: true
 
 jobs: 
-  build-and-test: 
-    # uses: DnDBeyond/waterdeep-web/.github/workflows/_build-and-test.yml@master
-    uses: .github/workflows/_build-and-test.yml
+  build-and-test:
+    uses: andersb1-wotc/actions-testing-releases/.github/workflows/_build-and-test.yml@main
     secrets: inherit

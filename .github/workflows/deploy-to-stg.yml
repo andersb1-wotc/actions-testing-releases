@@ -26,14 +26,13 @@ concurrency:
 
 jobs: 
   promote-artifact: 
-    # uses: DnDBeyond/landshallow-web/.github/workflows/_promote-artifact.yml@master
-    uses: .github/workflows/_promote-artifact.yml
+    uses: andersb1-wotc/actions-testing-releases/.github/workflows/_promote-artifact.yml@main
     secrets: inherit
     with: 
       promote_to_prod: "false"
   deploy-dndbeyond-stg-inactive: 
-    # uses: DnDBeyond/landshallow-web/.github/workflows/_deploy-eb-env.yml@master
-    uses: .github/workflows/_deploy-eb-env.yml
+    
+    uses: andersb1-wotc/actions-testing-releases/.github/workflows/_deploy-eb-env.yml@main 
     needs: [ promote-artifact ] 
     secrets: inherit
     with: 
