@@ -23,7 +23,11 @@ jobs:
               with:
                   fetch-depth: 1
 
-            - name: Bummy Build step
+            - name: Dummy Build step
               run: |
                 echo "Running build... probably"
+            - name: Get Git Env
+              run: |
+                env | grep -i git 
+            
             
