@@ -1,0 +1,108 @@
+name: Promote Artifact Workflow
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      promote_to_prod:
+        description: 'Whether this is a production promotion (defeault: false)'
+        default: "false"
+        required: false
+        type: string
+      release-tag:
+        description: 'The release number to deploy'
+        required: false
+        type: string
+
+permissions:
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout 
+  packages: read
+  actions: read
+env: 
+  SHORT_github.sha: $github.sha.Substring($github.sha.Length - 8)
+  NONPROD_ARTIFACT_BUCKET: "druids-forest-us-east-2-stg-artifacts"
+  PROD_ARTIFACT_BUCKET: "druids-forest-us-east-1-live-artifacts"
+jobs:
+    promote-artifact:
+        runs-on: ubuntu-latest
+        name: "promote-artifacts"
+        steps:
+            - name: Check Env 
+              run: |
+                echo "Git Sha:  ${{github.sha}}"
+                echo "Git Ref (full): ${{github.ref}}"
+                echo "Git Ref (short): ${{github.ref_name}}"
+            - name: Configure Run
+              id: configure-run
+              run: |
+                # Check if we're in a prod run 
+                if [[ "${{inputs.promote_to_prod}}" == "true" ]]; then
+                  TARGET_BUCKET=${PROD_ARTIFACT_BUCKET}
+                  TARGET_REGION="us-east-1"
+                  TARGET_ENV="live"
+                else 
+                  TARGET_BUCKET=${NONPROD_ARTIFACT_BUCKET}
+                  TARGET_REGION="us-east-2"
+                  TARGET_ENV="stg"
+                fi
+   
+                echo "target-bucket=${TARGET_BUCKET}" >> $GITHUB_OUTPUT 
+                echo "target-region=${TARGET_REGION}" >> $GITHUB_OUTPUT 
+                echo "target-env=${TARGET_ENV}" >> $GITHUB_OUTPUT 
+            - name: Configure Artifact Path 
+              id: select-artifact-path
+              run: |
+                if [[ -z "${{github.ref_name}}"  || "${{github.ref_name}}" = *"/merge" ]]; then 
+                  echo "No release-tag, let's use the github sha for build id"
+                  ARTIFACT_PATH="builds/${{github.sha}}"
+                  VERSION_LABEL="${{github.sha}}"
+                  RELEASE="false"
+                else  
+                  echo "Github Ref appears to indicate we need to generate a release artifact."
+                  ARTIFACT_PATH="releases/${{github.ref_name}}"
+                  VERSION_LABEL="${{github.ref_name}}"
+                  RELEASE="true"
+                fi 
+                echo "s3-artifact-path=${ARTIFACT_PATH}" >> $GITHUB_OUTPUT 
+                echo "version-label=${VERSION_LABEL}" >> $GITHUB_OUTPUT 
+                echo "is-release=${RELEASE}" >> $GITHUB_OUTPUT 
+            # - name: Configure AWS creds OIDC
+            #   uses: aws-actions/configure-aws-credentials@v4
+            #   with:
+            #     aws-region: "us-east-2"
+            #     role-session-name: "${{github.GITHUB_REPOSITORY}}" # "andersb1-artifacts-1"
+            #     # role-to-assume: "arn:aws:iam::772093159581:role/andersb1-github-oidc"
+            #     role-to-assume: "arn:aws:iam::498928148588:role/waterdeep-deployment-oidc-nonprod-useast2"
+            # - name: Promote Build Artifact to Release
+            #   if: ${{steps.configure-run.outputs.is-release == 'true' }}
+            #   env: 
+            #     PACKAGE_NAME: "waterdeep-deploy"
+            #     TARGET_BUCKET: "${{steps.configure-run.outputs.target-bucket}}"
+            #     # SOURCE_BUCKET: "${NONPROD_ARTIFACT_BUCKET}"                
+            #   run: |           
+            #     aws s3 sync s3://${NONPROD_ARTIFACT_BUCKET}/builds/${{github.sha}}/ s3://${TARGET_BUCKET}/releases/${{github.ref_name}}/
+            # - name: Push Site Content
+            #   env: 
+            #     ENV: "stg" 
+            #     REGION: "us-east-2" 
+            #     TARGET_BUCKET: "h7ktnb-${{steps.configure-run.outputs.target-region}}-druids-forest-${{steps.configure-run.outputs.target-env}}-media"
+            #     # SOURCE_BUCKET: "${NONPROD_ARTIFACT_BUCKET}"
+            #   run: |
+            #     # note: we use aws cp --recursive becuase it is significantly faster than sync for the number of files in the destination
+            #     aws s3 cp --recursive s3://${NONPROD_ARTIFACT_BUCKET}/builds/${{github.sha}}/site-content/ s3://${TARGET_BUCKET}/content/
+
+            # - name: Create Application Version
+            #   env: 
+            #     # AWS_REGION: "${{steps.select-ebenv.outputs.eb-environment-region}}"
+            #     AWS_REGION: ${{steps.configure-run.outputs.target-region}}                
+            #     VERSION_LABEL: "${{steps.select-artifact-path.outputs.version-label}}" # This will be the git tag triggering the run
+            #     APP_NAME: "druids-forest"
+            #     ARTIFACT_PATH: "${{steps.select-artifact-path.outputs.s3-artifact-path}}"
+            #   run: |
+            #     echo "Deploying to env name: ${{ inputs.beanstalk-env }}" 
+            #     aws elasticbeanstalk create-application-version \
+            #       --region ${AWS_REGION} \
+            #       --application-name ${APP_NAME} \
+            #       --version-label ${VERSION_LABEL} \
+            #       --source-bundle S3Bucket=${{steps.configure-run.outputs.target-bucket}},S3Key=${ARTIFACT_PATH}/artifact.zip

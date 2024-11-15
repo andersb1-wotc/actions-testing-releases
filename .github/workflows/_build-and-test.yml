@@ -1,0 +1,29 @@
+name: Build Workflow
+
+on:
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout
+  packages: read
+  actions: read
+
+env:
+  FOO: "barbatbaz"
+
+jobs:
+    build:
+        # runs-on: windows-2019
+        runs-on: ubuntu-latest
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 1
+
+            - name: Bummy Build step
+              run: |
+                echo "Running build... probably"
+            

@@ -1,0 +1,39 @@
+name: Upload Artifact Content to S3 
+Description: "Uploads artifact content from the build to S3"
+inputs:
+  s3-bucket-name:
+    description: 'The name of the S3 bucket files will be uploaded to'
+    required: true
+    type: string
+  s3-prefix: 
+    description: 'The key prefix used as an S3 destination (i.e. te S3 folder to copy files into)'
+    default: 'content'
+    required: true
+  artifact-name: 
+    description: 'The name of the artifact to fetch for content to sync to s3'
+    default: 'waterdeep-s3-content'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: waterdeep-s3-content
+          path: waterdeep-s3-content/
+      - name: Configure AWS creds OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: "us-east-2"
+          role-session-name: "waterdeep-eb-s3-sync"
+          role-to-assume: "arn:aws:iam::498928148588:role/waterdeep-deployment-oidc"
+      - name: Sync S3 content
+        shell: bash
+        run: |
+          aws configure set default.s3.max_concurrent_requests 200
+          echo "Starting s3 copy"
+          aws s3 cp waterdeep-s3-content/ s3://${{ inputs.s3-bucket-name }}/${{ inputs.s3-prefix }}/ --recursive --acl public-read
+      - name: Cleanup
+        shell: bash
+        run: |        
+          rm -rf waterdeep-s3-content

@@ -1,0 +1,41 @@
+name: landshallow - Deploy to STG (Active)
+
+on:
+  release:
+    types: [published]
+  # push:
+  #   tags:
+  #     - '**' 
+  # push:
+  #   branches: [ master ]
+  #   paths-ignore:
+  #     - "README.md"
+  #     - ".terraform/**"
+  #     - "landshallow/Database Change Scripts/**"
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout
+  packages: read
+  actions: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
+
+jobs: 
+  promote-artifact: 
+    # uses: DnDBeyond/landshallow-web/.github/workflows/_promote-artifact.yml@master
+    uses: .github/workflows/_promote-artifact.yml
+    secrets: inherit
+    with: 
+      promote_to_prod: "false"
+  deploy-dndbeyond-stg-inactive: 
+    # uses: DnDBeyond/landshallow-web/.github/workflows/_deploy-eb-env.yml@master
+    uses: .github/workflows/_deploy-eb-env.yml
+    needs: [ promote-artifact ] 
+    secrets: inherit
+    with: 
+      beanstalk-env: "dndbeyond-stg-active"
+      eb-application-name: "dndbeyond"

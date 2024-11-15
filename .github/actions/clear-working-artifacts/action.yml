@@ -1,0 +1,12 @@
+name: 'Clear Working Directory Artifacts'
+description: 'Clears old test files and similar'
+runs:
+    using: 'composite'
+    steps:
+        - name: Clear .trx files
+          shell: powershell 
+          run: | 
+            Remove-Item -Recurse -Force *.trx -ErrorAction Ignore
+            Remove-Item -Recurse -Force test-results\*.trx -ErrorAction Ignore
+            # Do we need bamboo removals anymore? 
+            # Remove-Item -Recurse -Force SYSTEM_BAMBOO* -ErrorAction Ignore

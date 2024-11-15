@@ -1,0 +1,27 @@
+name: Waterdeep - Build and Test
+
+on:
+  push:
+    branches: [ master ]
+    paths-ignore:
+      - "README.md"
+      - "_infrastructure/**"
+      - "waterdeep/Database Change Scripts/**"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout
+  packages: read
+  actions: read
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: true
+
+jobs: 
+  build-and-test: 
+    # uses: DnDBeyond/waterdeep-web/.github/workflows/_build-and-test.yml@master
+    uses: .github/workflows/_build-and-test.yml
+    secrets: inherit

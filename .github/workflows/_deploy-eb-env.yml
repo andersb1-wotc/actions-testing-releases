@@ -1,0 +1,178 @@
+name: Deploy Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      beanstalk-env:
+        description: 'The name of the ElasticBeanstalk environment to deploy to'
+        default: "druids-forest-stg-active"
+        required: true
+        type: choice
+        options: 
+        - druids-forest-stg-active
+        - druids-forest-stg-inactive
+        - druids-forest-draft-active
+        - druids-forest-review-active
+        - druids-forest-live-active
+        - druids-forest-mobile-active
+      release-tag:
+        description: 'The release number to deploy'
+        required: true
+        type: string
+      my-application-name:
+        description: 'The release number to deploy'
+        required: false
+        type: string
+        default: "druids-forest"
+
+  workflow_call:
+    inputs:
+      beanstalk-env:
+        description: 'The name of the S3 bucket files will be uploaded to'
+        default: "druids-forest-stg-inactive"
+        required: true
+        type: string
+      release-tag:
+        description: 'The release number to deploy'
+        required: false
+        type: string
+      my-application-name:
+        description: 'The release number to deploy'
+        required: false
+        type: string
+        default: "druids-forest"
+
+permissions:
+  id-token: write   # This is required for requesting the JWT
+  contents: read    # This is required for actions/checkout 
+  packages: read
+  actions: read
+env: 
+  STG_EB_ACTIVE_URL: druids-forest-stg.us-east-2.elasticbeanstalk.com
+  DRAFT_EB_ACTIVE_URL: druids-forest-draft.us-east-2.elasticbeanstalk.com
+  REVIEW_EB_ACTIVE_URL: druids-forest-review.us-east-2.elasticbeanstalk.com
+  LIVE_EB_ACTIVE_URL: druids-forest-live.us-east-1.elasticbeanstalk.com
+  MOBILE_EB_ACTIVE_URL: druids-forest-mobile-live.us-east-1.elasticbeanstalk.com
+  NONPROD_OIDC_ROLE: "arn:aws:iam::1234567890:role/landshallow-deployment-oidc-nonprod-useast2"
+  PROD_OIDC_ROLE: "arn:aws:iam::1234567890:role/landshallow-deployment-oidc-prod-useast1"
+jobs:
+    deploy-env:
+        runs-on: ubuntu-latest
+        environment: ${{ inputs.beanstalk-env }}
+        name: "deploy-to-${{ inputs.beanstalk-env }}"
+        steps:
+            # - name: Checkout
+            #   uses: actions/checkout@v4
+            #   with:
+            #       fetch-depth: 1
+
+            - name: Configure Artifact Path 
+              id: select-artifact-path
+              run: |
+                if [[ -z "${{inputs.release-tag}}"  ]]; then 
+                  echo "No release-tag, let's use the github sha for build id"
+                  ARTIFACT_PATH="builds/${{github.sha}}"
+                  VERSION_LABEL="${{github.sha}}"
+                  OIDC_ROLE=${NONPROD_OIDC_ROLE}
+                else  
+                  ARTIFACT_PATH="releases/${{inputs.release-tag}}"
+                  VERSION_LABEL="${{inputs.release-tag}}"
+                  OIDC_ROLE=${PROD_OIDC_ROLE}
+                fi 
+                echo "s3-artifact-path=${ARTIFACT_PATH}" >> $GITHUB_OUTPUT 
+                echo "version-label=${VERSION_LABEL}" >> $GITHUB_OUTPUT 
+                echo "oidc-role=${OIDC_ROLE}" >> $GITHUB_OUTPUT 
+            # - name: Configure AWS creds OIDC
+            #   uses: aws-actions/configure-aws-credentials@v4
+            #   with:
+            #     aws-region: "us-east-2"
+            #     role-session-name: "${{github.GITHUB_REPOSITORY}}" # "andersb1-artifacts-1"
+            #     # role-to-assume: "arn:aws:iam::1234567890:role/landshallow-deployment-oidc"
+            #     role-to-assume: ${{steps.select-artifact-path.outputs.oidc-role}}
+
+
+            # - name: Select Beanstalk Environment 
+            #   id: select-ebenv
+            #   env:
+            #     APP_NAME: "${{inputs.my-application-name}}"
+            #   run: |
+            #     case ${{inputs.beanstalk-env}} in
+            #       druids-forest-stg-active)
+            #         SHORTENV="stg"
+            #         JQ_URL_FILTER="${STG_EB_ACTIVE_URL}"
+            #         REGION="us-east-2"
+            #       ;;
+            #       druids-forest-stg-inactive)
+            #         SHORTENV="stg"
+            #         JQ_URL_FILTER="${STG_EB_ACTIVE_URL}"
+            #         REGION="us-east-2"
+            #         INACTIVE="true"
+            #       ;;
+            #       druids-forest-draft-active)
+            #         SHORTENV="draft"
+            #         JQ_URL_FILTER="${DRAFT_EB_ACTIVE_URL}"
+            #         REGION="us-east-2"
+            #       ;;
+            #       druids-forest-review-active)
+            #         SHORTENV="review"
+            #         JQ_URL_FILTER="${REVIEW_EB_ACTIVE_URL}"
+            #         REGION="us-east-2"
+            #       ;;
+            #       druids-forest-live-active)
+            #         SHORTENV="live"
+            #         JQ_URL_FILTER="${LIVE_EB_ACTIVE_URL}"
+            #         REGION="us-east-1"
+            #       ;;
+            #       druids-forest-mobile-active)
+            #         SHORTENV="mobile-live"
+            #         JQ_URL_FILTER="${MOBILE_EB_ACTIVE_URL}"
+            #         REGION="us-east-1"
+            #     esac 
+
+            #     # NOTE: Jq is very sensitive to quoting. Don't change or modify the double quotes here or the filter may break
+            #     JQ_ENV_FILTER="$APP_NAME-$SHORTENV"
+
+            #     RES=$(aws elasticbeanstalk describe-environments \
+            #         --region ${REGION} \
+            #         --application-name  ${APP_NAME}   )
+            #     # Grab all EB Env whose names match the short env 
+            #     ALL_MATCHING_EB_ENV=$(echo $RES |  jq --arg JQ_ENV_FILTER $JQ_ENV_FILTER  '.Environments | map(select(.EnvironmentName | contains( $JQ_ENV_FILTER )))' )
+
+            #     if [[ -z "${INACTIVE}"  ]]; then
+            #       # Select the EB env whose url matches the known "active" url
+            #       SELECTED_ENV=$(echo $ALL_MATCHING_EB_ENV |  jq --arg JQ_URL_FILTER $JQ_URL_FILTER  '. | map(select(.CNAME | contains( $JQ_URL_FILTER ))) | .[0]' )
+            #     else 
+            #       SELECTED_ENV=$(echo $ALL_MATCHING_EB_ENV |  jq --arg JQ_URL_FILTER $JQ_URL_FILTER  '. | map(select(.CNAME | contains( $JQ_URL_FILTER )| not )) | .[0]' )
+            #     fi 
+            #     echo "Selected the following ENV: $SELECTED_ENV" 
+            #     SELECTED_ENV_NAME=$(echo $SELECTED_ENV |  jq .EnvironmentName | tr -d '"' )
+            #     echo "eb-environment-name=${SELECTED_ENV_NAME}" >> $GITHUB_OUTPUT
+            #     echo "eb-environment-region=${REGION}" >> $GITHUB_OUTPUT 
+            # - name: Verify App Version Exists
+            #   env:
+            #     AWS_REGION: ${{steps.select-ebenv.outputs.eb-environment-region}}
+            #     APPLICATION_NAME: druids-forest
+            #     VERSION_LABEL: ${{steps.select-artifact-path.outputs.version-label}}
+            #   run: |
+            #     echo "Verifying application version exists"
+            #     RES=$(aws elasticbeanstalk describe-applications --application-name ${APPLICATION_NAME} --region ${AWS_REGION} )
+            #     SELECTED_VERSION=$(echo ${RES} | jq ' .Applications[0].Versions  ' | grep ${VERSION_LABEL}  )
+            #     if [[ -z "${SELECTED_VERSION}" ]]; then 
+            #       echo "Application version ${VERSION_LABEL} not found for application ${APPLICATION_NAME} in ${AWS_REGION}"
+            #       exit 1 ; 
+            #     fi 
+                
+            # - name: Deploy Application Version to ENV
+            #   env: 
+            #     AWS_REGION: ${{steps.select-ebenv.outputs.eb-environment-region}}
+            #     VERSION_LABEL: ${{steps.select-artifact-path.outputs.version-label}}
+            #     APP_NAME: "${{inputs.my-application-name}}"
+            #     TARGET_EB_ENV: "${{steps.select-ebenv.outputs.eb-environment-name}}"
+            #   run: |
+            #     echo "Deploying to env: ${{ inputs.beanstalk-env }}" 
+            #     aws elasticbeanstalk update-environment   \
+            #       --region ${AWS_REGION} \
+            #       --application-name ${APP_NAME} \
+            #       --environment-name ${TARGET_EB_ENV} \
+            #       --version-label ${VERSION_LABEL}     
+                
