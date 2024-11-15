@@ -37,11 +37,11 @@ jobs:
     secrets: inherit
     with: 
       promote_to_prod: "false"
-  deploy-dndbeyond-stg-inactive: 
+  deploy-druids-forest-stg-inactive: 
     
     uses: andersb1-wotc/actions-testing-releases/.github/workflows/_deploy-eb-env.yml@main 
     needs: [ promote-artifact ] 
     secrets: inherit
     with: 
-      beanstalk-env: "dndbeyond-stg-active"
-      eb-application-name: "dndbeyond"
+      beanstalk-env: "druids-forest-stg-active"
+      eb-application-name: "druids-forest"
