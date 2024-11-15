@@ -53,7 +53,7 @@ jobs:
             - name: Configure Artifact Path 
               id: select-artifact-path
               run: |
-                if [[ -z "${{github.ref_name}}"  || "${{github.ref_name}}" = *"/merge" ]]; then 
+                if [[ "${{github.ref_type}}" != "tag" ]]; then 
                   echo "No release-tag, let's use the github sha for build id"
                   ARTIFACT_PATH="builds/${{github.sha}}"
                   VERSION_LABEL="${{github.sha}}"
@@ -64,9 +64,9 @@ jobs:
                   VERSION_LABEL="${{github.ref_name}}"
                   RELEASE="true"
                 fi 
-                echo "s3-artifact-path=${ARTIFACT_PATH}" >> $GITHUB_OUTPUT 
-                echo "version-label=${VERSION_LABEL}" >> $GITHUB_OUTPUT 
-                echo "is-release=${RELEASE}" >> $GITHUB_OUTPUT 
+                echo "s3-artifact-path=${ARTIFACT_PATH}" 
+                echo "version-label=${VERSION_LABEL}" 
+                echo "is-release=${RELEASE}" 
             # - name: Configure AWS creds OIDC
             #   uses: aws-actions/configure-aws-credentials@v4
             #   with:
