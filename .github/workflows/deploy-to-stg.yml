@@ -25,6 +25,12 @@ concurrency:
     cancel-in-progress: true
 
 jobs: 
+
+  get-env:
+    steps:
+      - name: Get Git Env
+        run: |
+          env | grep -i git 
   promote-artifact: 
     uses: andersb1-wotc/actions-testing-releases/.github/workflows/_promote-artifact.yml@main
     secrets: inherit
